@@ -81,6 +81,12 @@ SUPPORT_BODY = """Поддержка
 
 Можно ответить прямо в этом чате с тегом #поддержка — так заявка не потеряется."""
 
+GREETING_TEXT = """Здравствуйте!
+
+Я помогаю с разработкой чат-ботов для ВКонтакте и Telegram: покажу портфолио, отвечу на частые вопросы или подскажу, как связаться с поддержкой.
+
+Выберите действие кнопкой ниже."""
+
 
 def _env_int(name: str) -> int | None:
     raw = os.environ.get(name, "").strip()
@@ -98,9 +104,10 @@ def _random_id() -> int:
 
 def _main_menu_keyboard() -> str:
     kb = VkKeyboard(one_time=False)
-    kb.add_button("Примеры работ", color=VkKeyboardColor.PRIMARY)
-    kb.add_button("Частые вопросы", color=VkKeyboardColor.PRIMARY)
+    kb.add_button("Портфолио", color=VkKeyboardColor.PRIMARY)
+    kb.add_button("FAQ", color=VkKeyboardColor.PRIMARY)
     kb.new_line()
+    kb.add_button("Меню", color=VkKeyboardColor.SECONDARY)
     kb.add_button("Поддержка", color=VkKeyboardColor.SECONDARY)
     return kb.get_keyboard()
 
@@ -113,7 +120,7 @@ def _faq_menu_keyboard() -> str:
             kb.new_line()
     if len(FAQ_ITEMS) % 2 == 1:
         kb.new_line()
-    kb.add_button("⬅ В главное меню", color=VkKeyboardColor.SECONDARY)
+    kb.add_button("⬅ Меню", color=VkKeyboardColor.SECONDARY)
     return kb.get_keyboard()
 
 
@@ -154,7 +161,8 @@ def _faq_answer_by_button_payload(text: str) -> str | None:
 
 
 def _is_portfolio_request(text_raw: str, text_norm: str) -> bool:
-    if text_raw.strip() == "Примеры работ":
+    s = text_raw.strip()
+    if s in ("Портфолио", "Примеры работ"):
         return True
     return bool(re.search(r"\bпример[ыа]?\s+работ", text_norm)) or text_norm in (
         "портфолио",
@@ -164,7 +172,8 @@ def _is_portfolio_request(text_raw: str, text_norm: str) -> bool:
 
 
 def _is_faq_menu_request(text_raw: str, text_norm: str) -> bool:
-    if text_raw.strip() == "Частые вопросы":
+    s = text_raw.strip()
+    if s in ("FAQ", "Частые вопросы"):
         return True
     return text_norm in ("faq", "частые вопросы", "вопросы") or text_norm.startswith(
         "частые вопросы "
@@ -184,13 +193,25 @@ def _is_support_request(text_raw: str, text_norm: str) -> bool:
     )
 
 
-def _is_main_menu_request(text_norm: str) -> bool:
+def _is_main_menu_request(text_raw: str, text_norm: str) -> bool:
+    s = text_raw.strip()
+    if s in ("⬅ Меню", "⬅ В главное меню"):
+        return True
     return bool(
         re.search(
             r"\bглавн(ое|ая)?\s+меню\b|\bв\s+меню\b|\bназад\b",
             text_norm,
         )
     )
+
+
+def _should_show_greeting(text_raw: str, text_norm: str) -> bool:
+    s = text_raw.strip()
+    if s in ("Меню", "⬅ Меню", "⬅ В главное меню"):
+        return True
+    if text_norm in ("старт", "/start", "начать", "привет", "hi", "hello", "меню"):
+        return True
+    return _is_main_menu_request(text_raw, text_norm)
 
 
 def run_bot() -> None:
@@ -212,6 +233,13 @@ def run_bot() -> None:
     log.info("VK Bots Long Poll запущен для group_id=%s", group_id)
 
     for event in longpoll.listen():
+        if event.type == VkBotEventType.MESSAGE_ALLOW:
+            obj = event.object
+            uid = obj.get("user_id") if obj else None
+            if uid:
+                _send(vk, uid, GREETING_TEXT, keyboard=_main_menu_keyboard())
+            continue
+
         if event.type != VkBotEventType.MESSAGE_NEW:
             continue
 
@@ -239,7 +267,7 @@ def run_bot() -> None:
                 peer_id,
                 "Частые вопросы\n\n"
                 + "\n".join(lines)
-                + "\n\nВыберите тему кнопкой ниже или вернитесь в меню.",
+                + "\n\nВыберите тему кнопкой ниже или нажмите «Меню».",
                 keyboard=_faq_menu_keyboard(),
             )
         elif _is_support_request(text_raw, text_norm):
@@ -249,26 +277,13 @@ def run_bot() -> None:
                 SUPPORT_BODY.format(url=support_url),
                 keyboard=_main_menu_keyboard(),
             )
-        elif _is_main_menu_request(text_norm):
-            _send(
-                vk,
-                peer_id,
-                "Главное меню. Выберите раздел:",
-                keyboard=_main_menu_keyboard(),
-            )
-        elif text_norm in ("старт", "/start", "начать", "привет", "hi", "hello", "меню"):
-            _send(
-                vk,
-                peer_id,
-                "Привет! Я помогу с примерами работ, ответами на частые вопросы и контактом поддержки.\n\n"
-                "Выберите раздел кнопкой ниже.",
-                keyboard=_main_menu_keyboard(),
-            )
+        elif _should_show_greeting(text_raw, text_norm):
+            _send(vk, peer_id, GREETING_TEXT, keyboard=_main_menu_keyboard())
         else:
             _send(
                 vk,
                 peer_id,
-                "Выберите раздел в меню или напишите: примеры работ, частые вопросы, поддержка.",
+                "Выберите действие кнопкой: Портфолио, FAQ, Меню или Поддержка.",
                 keyboard=_main_menu_keyboard(),
             )
 
