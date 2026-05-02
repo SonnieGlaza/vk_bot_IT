@@ -131,12 +131,12 @@ def _faq_menu_keyboard() -> str:
     return kb.get_keyboard()
 
 
-def _support_url(group_id: int) -> str:
+def _support_url() -> str:
+    """Переопределение: переменная окружения SUPPORT_URL."""
     custom = os.environ.get("SUPPORT_URL", "").strip()
     if custom:
         return custom
-    gid = abs(group_id) if group_id < 0 else group_id
-    return f"https://vk.com/im?sel=-{gid}"
+    return "https://vk.me/kolechka59"
 
 
 def _send(
@@ -290,7 +290,7 @@ def run_bot() -> None:
         )
         return
 
-    support_url = _support_url(group_id)
+    support_url = _support_url()
 
     while True:
         try:
