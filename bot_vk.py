@@ -113,7 +113,7 @@ def _main_menu_keyboard() -> str:
     kb = VkKeyboard(one_time=False)
     kb.add_button("Портфолио", color=VkKeyboardColor.PRIMARY)
     kb.add_button("FAQ", color=VkKeyboardColor.PRIMARY)
-    kb.new_line()
+    kb.add_line()
     kb.add_button("Меню", color=VkKeyboardColor.SECONDARY)
     kb.add_button("Поддержка", color=VkKeyboardColor.SECONDARY)
     return kb.get_keyboard()
@@ -124,9 +124,9 @@ def _faq_menu_keyboard() -> str:
     for i, (title, _) in enumerate(FAQ_ITEMS):
         kb.add_button(f"❓ {title}", color=VkKeyboardColor.PRIMARY)
         if i % 2 == 1:
-            kb.new_line()
+            kb.add_line()
     if len(FAQ_ITEMS) % 2 == 1:
-        kb.new_line()
+        kb.add_line()
     kb.add_button("⬅ Меню", color=VkKeyboardColor.SECONDARY)
     return kb.get_keyboard()
 
