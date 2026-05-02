@@ -1,11 +1,22 @@
-"""Minimal HTTP server entrypoint for Nixpacks deployments."""
+"""HTTP healthcheck + VK бот (Long Poll) в фоне."""
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import logging
 import os
+
+from bot_vk import start_bot_thread
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 
 class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):  # noqa: N802 - BaseHTTPRequestHandler method name
+    def log_message(self, fmt: str, *args) -> None:
+        logging.getLogger("http").info("%s - %s", self.address_string(), fmt % args)
+
+    def do_GET(self):  # noqa: N802
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
@@ -13,9 +24,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    start_bot_thread()
+
     port = int(os.environ.get("PORT", "8080"))
     server = HTTPServer(("0.0.0.0", port), Handler)
-    print(f"Listening on port {port}")
+    logging.getLogger(__name__).info("HTTP listening on port %s", port)
     server.serve_forever()
 
 
