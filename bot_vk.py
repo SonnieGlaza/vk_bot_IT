@@ -15,14 +15,21 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 log = logging.getLogger(__name__)
 
-PORTFOLIO_TEXT = """Примеры работ
+PORTFOLIO_TEXT = """Примеры работ (мои репозитории на GitHub)
 
-• Канал/группа ВК — оформление, посты, рубрики
-• Чат-бот для приёма заявок и ответов на частые вопросы
-• Интеграция с CRM / Google Таблицами (по запросу)
-• Техническая поддержка и доработки существующих ботов
+• telega_stalker — Telegram-игра в стиле S.T.A.L.K.E.R. (python3, aiogram): регистрация, фракции, инвентарь и снаряга, задания, война за точки, рейды, события Зоны, экономика.
+https://github.com/SonnieGlaza/telega_stalker
 
-Если нужно что-то из списка или своё — напишите в поддержку."""
+• vk-prof-bot — VK-бот на Python.
+https://github.com/SonnieGlaza/vk-prof-bot
+
+• study — учебные и экспериментальные наработки.
+https://github.com/SonnieGlaza/study
+
+Профиль и остальные репозитории:
+https://github.com/SonnieGlaza?tab=repositories
+
+Нужно что-то похожее или под ключ — напишите в поддержку."""
 
 FAQ_ITEMS: list[tuple[str, str]] = [
     (
