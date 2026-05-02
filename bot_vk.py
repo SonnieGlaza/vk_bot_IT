@@ -15,19 +15,13 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 log = logging.getLogger(__name__)
 
-PORTFOLIO_TEXT = """Примеры работ (мои репозитории на GitHub)
+PORTFOLIO_TEXT = """Примеры работ
 
 • telega_stalker — Telegram-игра в стиле S.T.A.L.K.E.R. (python3, aiogram): регистрация, фракции, инвентарь и снаряга, задания, война за точки, рейды, события Зоны, экономика.
-https://github.com/SonnieGlaza/telega_stalker
 
 • vk-prof-bot — VK-бот на Python.
-https://github.com/SonnieGlaza/vk-prof-bot
 
 • nail-salon-bot — бот для салона (Python).
-https://github.com/SonnieGlaza/nail-salon-bot
-
-Профиль и остальные репозитории:
-https://github.com/SonnieGlaza?tab=repositories
 
 Нужно что-то похожее или под ключ — напишите в поддержку."""
 
