@@ -24,7 +24,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    start_bot_thread()
+    t = start_bot_thread()
+    if t is None:
+        logging.getLogger(__name__).error(
+            "VK-бот не запущен: проверьте переменные VK_GROUP_TOKEN и VK_GROUP_ID "
+            "на хостинге. HTTP продолжает работать для проверки деплоя."
+        )
 
     port = int(os.environ.get("PORT", "8080"))
     server = HTTPServer(("0.0.0.0", port), Handler)

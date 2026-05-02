@@ -7,6 +7,8 @@ import os
 import random
 import re
 import threading
+import time
+import traceback
 from typing import Any
 
 import vk_api
@@ -88,12 +90,17 @@ GREETING_TEXT = """Здравствуйте!
 Выберите действие кнопкой ниже."""
 
 
-def _env_int(name: str) -> int | None:
-    raw = os.environ.get(name, "").strip()
-    if not raw:
+def _parse_vk_group_id(raw: str) -> int | None:
+    """Число или вид club123456 / public123456 — для VK_GROUP_ID в настройках."""
+    s = raw.strip()
+    if not s:
         return None
+    m = re.match(r"^(?:club|public|event)(\d+)$", s, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
     try:
-        return int(raw)
+        v = int(s)
+        return abs(v)
     except ValueError:
         return None
 
@@ -214,83 +221,121 @@ def _should_show_greeting(text_raw: str, text_norm: str) -> bool:
     return _is_main_menu_request(text_raw, text_norm)
 
 
+def _handle_event(vk: Any, support_url: str, event: Any) -> None:
+    if event.type == VkBotEventType.MESSAGE_ALLOW:
+        obj = event.object
+        uid = obj.get("user_id") if obj else None
+        if uid:
+            _send(vk, uid, GREETING_TEXT, keyboard=_main_menu_keyboard())
+        return
+
+    if event.type != VkBotEventType.MESSAGE_NEW:
+        return
+
+    msg = event.message
+    if not msg:
+        return
+    peer_id = msg.get("peer_id")
+    if peer_id is None:
+        return
+
+    text_raw = msg.get("text") or ""
+    text_norm = _normalize_text(text_raw)
+
+    direct = _faq_answer_by_button_payload(text_raw)
+    if direct:
+        _send(vk, peer_id, direct, keyboard=_faq_menu_keyboard())
+        return
+
+    if _is_portfolio_request(text_raw, text_norm):
+        _send(vk, peer_id, PORTFOLIO_TEXT, keyboard=_main_menu_keyboard())
+    elif _is_faq_menu_request(text_raw, text_norm):
+        lines = [f"• {t[0]}" for t in FAQ_ITEMS]
+        _send(
+            vk,
+            peer_id,
+            "Частые вопросы\n\n"
+            + "\n".join(lines)
+            + "\n\nВыберите тему кнопкой ниже или нажмите «Меню».",
+            keyboard=_faq_menu_keyboard(),
+        )
+    elif _is_support_request(text_raw, text_norm):
+        _send(
+            vk,
+            peer_id,
+            SUPPORT_BODY.format(url=support_url),
+            keyboard=_main_menu_keyboard(),
+        )
+    elif _should_show_greeting(text_raw, text_norm):
+        _send(vk, peer_id, GREETING_TEXT, keyboard=_main_menu_keyboard())
+    else:
+        _send(
+            vk,
+            peer_id,
+            "Выберите действие кнопкой: Портфолио, FAQ, Меню или Поддержка.",
+            keyboard=_main_menu_keyboard(),
+        )
+
+
 def run_bot() -> None:
     token = os.environ.get("VK_GROUP_TOKEN", "").strip()
-    raw_gid = _env_int("VK_GROUP_ID")
-    if not token or raw_gid is None:
-        log.warning(
-            "VK бот не запущен: задайте VK_GROUP_TOKEN и VK_GROUP_ID в переменных окружения."
+    raw_gid = os.environ.get("VK_GROUP_ID", "").strip()
+    group_id = _parse_vk_group_id(raw_gid) if raw_gid else None
+    if not token or group_id is None:
+        log.error(
+            "VK бот не запущен: задайте VK_GROUP_TOKEN и VK_GROUP_ID "
+            "(число из адреса сообщества: club123 → 123). Сейчас токен=%s, VK_GROUP_ID=%r.",
+            "есть" if token else "нет",
+            raw_gid or None,
         )
         return
 
-    group_id = raw_gid
     support_url = _support_url(group_id)
 
-    vk_session = vk_api.VkApi(token=token)
-    vk = vk_session.get_api()
-    longpoll = VkBotLongPoll(vk_session, group_id=group_id)
+    while True:
+        try:
+            vk_session = vk_api.VkApi(token=token)
+            vk = vk_session.get_api()
+            try:
+                info_list = vk.groups.getById(group_id=group_id)
+                if info_list:
+                    info = info_list[0]
+                    log.info(
+                        "VK: сообщество «%s», group_id=%s",
+                        info.get("name", "?"),
+                        group_id,
+                    )
+            except Exception:
+                log.exception(
+                    "VK groups.getById не удался — проверьте токен сообщества и VK_GROUP_ID."
+                )
 
-    log.info("VK Bots Long Poll запущен для group_id=%s", group_id)
+            longpoll = VkBotLongPoll(vk_session, group_id=group_id)
+            log.info("VK Long Poll слушает события (group_id=%s)", group_id)
 
-    for event in longpoll.listen():
-        if event.type == VkBotEventType.MESSAGE_ALLOW:
-            obj = event.object
-            uid = obj.get("user_id") if obj else None
-            if uid:
-                _send(vk, uid, GREETING_TEXT, keyboard=_main_menu_keyboard())
-            continue
+            for event in longpoll.listen():
+                try:
+                    _handle_event(vk, support_url, event)
+                except Exception:
+                    log.exception("Ошибка при обработке события VK")
 
-        if event.type != VkBotEventType.MESSAGE_NEW:
-            continue
-
-        msg = event.message
-        if not msg:
-            continue
-        peer_id = msg.get("peer_id")
-        if peer_id is None:
-            continue
-
-        text_raw = msg.get("text") or ""
-        text_norm = _normalize_text(text_raw)
-
-        direct = _faq_answer_by_button_payload(text_raw)
-        if direct:
-            _send(vk, peer_id, direct, keyboard=_faq_menu_keyboard())
-            continue
-
-        if _is_portfolio_request(text_raw, text_norm):
-            _send(vk, peer_id, PORTFOLIO_TEXT, keyboard=_main_menu_keyboard())
-        elif _is_faq_menu_request(text_raw, text_norm):
-            lines = [f"• {t[0]}" for t in FAQ_ITEMS]
-            _send(
-                vk,
-                peer_id,
-                "Частые вопросы\n\n"
-                + "\n".join(lines)
-                + "\n\nВыберите тему кнопкой ниже или нажмите «Меню».",
-                keyboard=_faq_menu_keyboard(),
+        except Exception:
+            log.error(
+                "VK Long Poll оборвался:\n%sПереподключение через 5 с.",
+                traceback.format_exc(),
             )
-        elif _is_support_request(text_raw, text_norm):
-            _send(
-                vk,
-                peer_id,
-                SUPPORT_BODY.format(url=support_url),
-                keyboard=_main_menu_keyboard(),
-            )
-        elif _should_show_greeting(text_raw, text_norm):
-            _send(vk, peer_id, GREETING_TEXT, keyboard=_main_menu_keyboard())
-        else:
-            _send(
-                vk,
-                peer_id,
-                "Выберите действие кнопкой: Портфолио, FAQ, Меню или Поддержка.",
-                keyboard=_main_menu_keyboard(),
-            )
+            time.sleep(5)
 
 
 def start_bot_thread() -> threading.Thread | None:
     token = os.environ.get("VK_GROUP_TOKEN", "").strip()
-    if not token or _env_int("VK_GROUP_ID") is None:
+    gid_raw = os.environ.get("VK_GROUP_ID", "").strip()
+    gid = _parse_vk_group_id(gid_raw) if gid_raw else None
+    if not token or gid is None:
+        log.error(
+            "Поток VK не стартовал: нужны переменные окружения VK_GROUP_TOKEN и VK_GROUP_ID "
+            "(ID сообщества — число или club123). На хостинге добавьте их в настройках сервиса."
+        )
         return None
 
     t = threading.Thread(target=run_bot, name="vk-bot-longpoll", daemon=True)
