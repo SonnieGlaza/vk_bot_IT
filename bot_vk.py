@@ -23,8 +23,8 @@ https://github.com/SonnieGlaza/telega_stalker
 • vk-prof-bot — VK-бот на Python.
 https://github.com/SonnieGlaza/vk-prof-bot
 
-• nal-salon-bot — бот для салона (Python).
-https://github.com/SonnieGlaza/nal-salon-bot
+• nail-salon-bot — бот для салона (Python).
+https://github.com/SonnieGlaza/nail-salon-bot
 
 Профиль и остальные репозитории:
 https://github.com/SonnieGlaza?tab=repositories
